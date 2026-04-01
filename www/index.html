@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#2563eb" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>多路線道路規劃地圖</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg-body: #f3f4f6;
+      --sidebar-bg: #ffffff;
+      --border-color: #e5e7eb;
+      --card-bg: #f8fafc;
+      --text-primary: #111827;
+      --text-secondary: #4b5563;
+      --label-color: #374151;
+      --input-border: #cbd5e1;
+      --divider-light: #eef2f7;
+      --saved-meta: #475569;
+      --tip-color: #64748b;
+      --status-color: #334155;
+    }
+
+    .theme-gray {
+      --bg-body: #0f172a;
+      --sidebar-bg: #1f2937;
+      --border-color: #334155;
+      --card-bg: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #e2e8f0;
+      --label-color: #cbd5e1;
+      --input-border: #64748b;
+      --divider-light: #475569;
+      --saved-meta: #94a3b8;
+      --tip-color: #94a3b8;
+      --status-color: #cbd5e1;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+      background: var(--bg-body);
+    }
+
+    .app { display: flex; height: 100vh; width: 100%; }
+
+    .sidebar {
+      width: 420px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border-color);
+      overflow-y: auto;
+      padding: 18px;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 28px; color: var(--text-primary); }
+    p.desc { margin: 0 0 16px; color: var(--text-secondary); line-height: 1.6; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .card-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: var(--text-primary);
+      font-size: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 14px;
+      color: var(--label-color);
+      font-weight: bold;
+    }
+
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      border: 1px solid var(--input-border);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    input[type="color"] {
+      width: 100%;
+      height: 42px;
+      border: 1px solid var(--input-border);
+      border-radius: 10px;
+      padding: 4px;
+      background: white;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .btn-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      cursor: pointer;
+      color: white;
+      background: #111827;
+    }
+    button:hover { opacity: 0.92; }
+    button:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    .primary { background: #2563eb; }
+    .danger { background: #dc2626; }
+    .success { background: #059669; }
+    .warning { background: #d97706; }
+    .gray { background: #475569; }
+
+    .status { font-size: 14px; color: var(--status-color); line-height: 1.6; }
+    .top-tip { font-size: 13px; color: var(--tip-color); line-height: 1.6; }
+
+    .waypoint-list {
+      margin-top: 8px;
+      border-top: 1px dashed var(--input-border);
+      padding-top: 8px;
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .waypoint-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--divider-light);
+      font-size: 13px;
+    }
+
+    .waypoint-item button {
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      background: #dc2626;
+    }
+
+    .saved-route {
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: var(--card-bg);
+    }
+
+    .saved-route-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .route-name-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .color-dot {
+      width: 14px; height: 14px; border-radius: 999px;
+      flex-shrink: 0; border: 1px solid rgba(0,0,0,0.15);
+    }
+    .route-name { font-weight: bold; color: var(--text-primary); word-break: break-word; }
+
+    .saved-route-meta {
+      font-size: 13px;
+      color: var(--saved-meta);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .saved-route-actions {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .map-wrap { flex: 1; position: relative; }
+    #map { width: 100%; height: 100%; }
+
+    /* Leaflet 主題切換按鈕樣式 */
+    .leaflet-theme-control {
+      background: #111827;
+      color: #fff;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      cursor: pointer;
+      user-select: none;
+    }
+    .leaflet-theme-control:hover {
+      background: #1f2937;
+      transform: scale(1.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1>多路線道路規劃</h1>
+      <p class="desc">
+        點地圖加入起點 / 經過點 / 終點，系統會沿真正道路算路線。<br>
+        你可以把不同走法存成不同顏色，像藍線一套、黃線另一套。
+      </p>
+
+      <div class="card">
+        <div class="card-title">建立新路線</div>
+        <label for="routeName">路線名稱</label>
+        <input id="routeName" type="text" value="未命名路線" />
+
+        <label for="routeColor">路線顏色</label>
+        <input id="routeColor" type="color" value="#2563eb" />
+
+        <label for="travelMode">移動模式</label>
+        <select id="travelMode">
+          <option value="driving">開車 / 機車</option>
+          <option value="walking">步行</option>
+          <option value="cycling">自行車</option>
+        </select>
+
+        <div class="top-tip">
+          地圖每點一次就新增一個點。至少要 2 個點才能規劃路線。<br>
+          多點會依照你加入的順序經過。
+        </div>
+
+        <div class="btn-row-3">
+          <button id="undoPointBtn" class="gray">刪最後點</button>
+          <button id="clearPointsBtn" class="danger">清空點位</button>
+          <button id="fitCurrentBtn" class="warning">縮放目前線</button>
+        </div>
+
+        <div class="waypoint-list" id="waypointList"></div>
+
+        <div class="btn-row">
+          <button id="planRouteBtn" class="primary">規劃道路路線</button>
+          <button id="saveRouteBtn" class="success" disabled>儲存這條路線</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">目前規劃結果</div>
+        <div class="status" id="currentRouteInfo">尚未規劃路線。</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">已儲存路線</div>
+        <div id="savedRoutesContainer">
+          <div class="status">目前還沒有儲存的路線。</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">操作說明</div>
+        <div class="status">
+          1. 直接點地圖加入點位<br>
+          2. 至少兩個點後按「規劃道路路線」<br>
+          3. 覺得這條走法 OK 就按「儲存這條路線」<br>
+          4. 每條路線可用不同顏色區分並永久保存在瀏覽器
+        </div>
+      </div>
+    </aside>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <script>
+    const STORAGE_KEY = "multi-road-routes-v1";
+    const DEFAULT_CENTER = [25.033964, 121.564468];
+
+    const map = L.map("map").setView(DEFAULT_CENTER, 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    // DOM 元素
+    const routeNameInput = document.getElementById("routeName");
+    const routeColorInput = document.getElementById("routeColor");
+    const travelModeSelect = document.getElementById("travelMode");
+    const waypointList = document.getElementById("waypointList");
+    const currentRouteInfo = document.getElementById("currentRouteInfo");
+    const savedRoutesContainer = document.getElementById("savedRoutesContainer");
+    const undoPointBtn = document.getElementById("undoPointBtn");
+    const clearPointsBtn = document.getElementById("clearPointsBtn");
+    const fitCurrentBtn = document.getElementById("fitCurrentBtn");
+    const planRouteBtn = document.getElementById("planRouteBtn");
+    const saveRouteBtn = document.getElementById("saveRouteBtn");
+
+    let currentWaypoints = [];
+    let currentWaypointMarkers = [];
+    let currentPlannedRoute = null;
+    let currentRouteLayer = null;
+    let currentAltLayers = [];
+    let savedRoutes = [];
+    const savedRouteLayers = new Map();
+
+    function formatDistance(meters) {
+      if (meters < 1000) return `${meters.toFixed(0)} 公尺`;
+      return `${(meters / 1000).toFixed(2)} 公里`;
+    }
+    function formatDuration(seconds) {
+      const mins = Math.round(seconds / 60);
+      if (mins < 60) return `${mins} 分鐘`;
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      return `${h} 小時 ${m} 分鐘`;
+    }
+
+    function setCurrentInfo(text) { currentRouteInfo.innerHTML = text; }
+    function clearCurrentRouteLayers() {
+      if (currentRouteLayer) { map.removeLayer(currentRouteLayer); currentRouteLayer = null; }
+      currentAltLayers.forEach(layer => map.removeLayer(layer));
+      currentAltLayers = [];
+    }
+
+    function redrawWaypointMarkers() {
+      currentWaypointMarkers.forEach(m => map.removeLayer(m));
+      currentWaypointMarkers = [];
+      currentWaypoints.forEach((pt, index) => {
+        const label = index === 0 ? "起點" : index === currentWaypoints.length - 1 ? "終點" : `經過點 ${index}`;
+        const marker = L.marker([pt.lat, pt.lng]).addTo(map);
+        marker.bindPopup(`<strong>${label}</strong><br>Lat: ${pt.lat.toFixed(6)}<br>Lng: ${pt.lng.toFixed(6)}`);
+        currentWaypointMarkers.push(marker);
+      });
+      renderWaypointList();
+    }
+
+    function renderWaypointList() {
+      if (currentWaypoints.length === 0) {
+        waypointList.innerHTML = `<div class="status">目前沒有點位，先去地圖上點幾下。</div>`;
+        return;
+      }
+      waypointList.innerHTML = currentWaypoints.map((pt, index) => {
+        const label = index === 0 ? "起點" : index === currentWaypoints.length - 1 ? "終點" : `經過點 ${index}`;
+        return `
+          <div class="waypoint-item">
+            <div><strong>${label}</strong><br>${pt.lat.toFixed(5)}, ${pt.lng.toFixed(5)}</div>
+            <button onclick="removeWaypoint(${index})">刪除</button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function removeWaypoint(index) {
+      currentWaypoints.splice(index, 1);
+      redrawWaypointMarkers();
+      clearCurrentRouteLayers();
+      currentPlannedRoute = null;
+      saveRouteBtn.disabled = true;
+      setCurrentInfo("點位已變更，請重新規劃路線。");
+    }
+    window.removeWaypoint = removeWaypoint;
+
+    // 地圖點擊加點（已恢復正常）
+    map.on("click", function (e) {
+      currentWaypoints.push({ lat: e.latlng.lat, lng: e.latlng.lng });
+      redrawWaypointMarkers();
+      clearCurrentRouteLayers();
+      currentPlannedRoute = null;
+      saveRouteBtn.disabled = true;
+      setCurrentInfo(`已加入第 ${currentWaypoints.length} 個點位，改完記得重新規劃。`);
+    });
+
+    undoPointBtn.addEventListener("click", () => {
+      if (currentWaypoints.length === 0) return;
+      currentWaypoints.pop();
+      redrawWaypointMarkers();
+      clearCurrentRouteLayers();
+      currentPlannedRoute = null;
+      saveRouteBtn.disabled = true;
+      setCurrentInfo("已刪除最後一個點位。");
+    });
+
+    clearPointsBtn.addEventListener("click", () => {
+      currentWaypoints = [];
+      redrawWaypointMarkers();
+      clearCurrentRouteLayers();
+      currentPlannedRoute = null;
+      saveRouteBtn.disabled = true;
+      setCurrentInfo("已清空目前點位。");
+    });
+
+    fitCurrentBtn.addEventListener("click", () => {
+      if (currentRouteLayer) {
+        map.fitBounds(currentRouteLayer.getBounds(), { padding: [30, 30] });
+        return;
+      }
+      if (currentWaypointMarkers.length > 0) {
+        const group = L.featureGroup(currentWaypointMarkers);
+        map.fitBounds(group.getBounds(), { padding: [30, 30] });
+      }
+    });
+
+    async function planRoadRoute() { /* 原有規劃路線函數保持不變 */ 
+      if (currentWaypoints.length < 2) { setCurrentInfo("至少要 2 個點才能規劃。"); return; }
+      clearCurrentRouteLayers();
+      saveRouteBtn.disabled = true;
+      setCurrentInfo("正在向道路路由服務查詢路線...");
+
+      const mode = travelModeSelect.value;
+      const coords = currentWaypoints.map(p => `${p.lng},${p.lat}`).join(";");
+
+      const url = `https://router.project-osrm.org/route/v1/${mode}/${coords}?overview=full&geometries=geojson&alternatives=true&steps=false`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data.routes || !data.routes.length) {
+          setCurrentInfo("查不到可走道路路線，可能點位太刁鑽。");
+          return;
+        }
+        const mainRoute = data.routes[0];
+        const altRoutes = data.routes.slice(1);
+
+        currentRouteLayer = L.geoJSON(mainRoute.geometry, {
+          style: { color: routeColorInput.value, weight: 6, opacity: 0.95 }
+        }).addTo(map);
+
+        currentAltLayers = altRoutes.map(r => L.geoJSON(r.geometry, {
+          style: { color: "#94a3b8", weight: 4, opacity: 0.55, dashArray: "8 8" }
+        }).addTo(map));
+
+        map.fitBounds(currentRouteLayer.getBounds(), { padding: [30, 30] });
+
+        currentPlannedRoute = {
+          id: crypto.randomUUID(),
+          name: routeNameInput.value.trim() || "未命名路線",
+          color: routeColorInput.value,
+          mode,
+          distance: mainRoute.distance,
+          duration: mainRoute.duration,
+          geometry: mainRoute.geometry,
+          waypoints: structuredClone(currentWaypoints),
+          createdAt: new Date().toISOString()
+        };
+
+        saveRouteBtn.disabled = false;
+        setCurrentInfo(`<strong>主路線規劃成功</strong><br>距離：${formatDistance(mainRoute.distance)}<br>時間：${formatDuration(mainRoute.duration)}<br>經過點數：${currentWaypoints.length}`);
+      } catch (err) {
+        console.error(err);
+        setCurrentInfo("路線規劃失敗，可能是網路或路由服務當掉。");
+      }
+    }
+    planRouteBtn.addEventListener("click", planRoadRoute);
+
+    saveRouteBtn.addEventListener("click", () => { /* 原有儲存路線函數保持不變 */ 
+      if (!currentPlannedRoute) return;
+      const newRoute = { ...currentPlannedRoute, id: crypto.randomUUID() };
+      savedRoutes.push(newRoute);
+      saveRoutesToLocal();
+      drawSavedRoute(newRoute, true);
+      renderSavedRoutes();
+      setCurrentInfo(`<strong>已儲存路線</strong><br>名稱：${newRoute.name}<br>距離：${formatDistance(newRoute.distance)}<br>時間：${formatDuration(newRoute.duration)}`);
+    });
+
+    function drawSavedRoute(route, visible = true) { /* 原有函數保持不變 */ 
+      if (savedRouteLayers.has(route.id)) {
+        map.removeLayer(savedRouteLayers.get(route.id));
+        savedRouteLayers.delete(route.id);
+      }
+      const layer = L.geoJSON(route.geometry, {
+        style: { color: route.color, weight: 6, opacity: visible ? 0.95 : 0 }
+      });
+      if (visible) layer.addTo(map);
+      savedRouteLayers.set(route.id, layer);
+      route.visible = visible;
+    }
+
+    function toggleSavedRoute(routeId) { /* 已優化版本 */
+      const route = savedRoutes.find(r => r.id === routeId);
+      if (!route) return;
+      const layer = savedRouteLayers.get(routeId);
+      if (!layer) return;
+      if (route.visible) {
+        map.removeLayer(layer);
+        route.visible = false;
+      } else {
+        layer.addTo(map);
+        route.visible = true;
+      }
+      saveRoutesToLocal();
+      renderSavedRoutes();
+    }
+
+    function zoomToSavedRoute(routeId) { /* 原有函數保持不變 */ 
+      const layer = savedRouteLayers.get(routeId);
+      if (layer) {
+        if (!map.hasLayer(layer)) {
+          layer.addTo(map);
+          const route = savedRoutes.find(r => r.id === routeId);
+          if (route) route.visible = true;
+        }
+        map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+        saveRoutesToLocal();
+        renderSavedRoutes();
+      }
+    }
+
+    function deleteSavedRoute(routeId) { /* 原有函數保持不變 */ 
+      const idx = savedRoutes.findIndex(r => r.id === routeId);
+      if (idx === -1) return;
+      const layer = savedRouteLayers.get(routeId);
+      if (layer) { map.removeLayer(layer); savedRouteLayers.delete(routeId); }
+      savedRoutes.splice(idx, 1);
+      saveRoutesToLocal();
+      renderSavedRoutes();
+    }
+
+    function useSavedRouteAsCurrent(routeId) { /* 原有函數保持不變 */ 
+      const route = savedRoutes.find(r => r.id === routeId);
+      if (!route) return;
+      currentWaypoints = structuredClone(route.waypoints);
+      routeNameInput.value = route.name;
+      routeColorInput.value = route.color;
+      travelModeSelect.value = route.mode;
+      redrawWaypointMarkers();
+      clearCurrentRouteLayers();
+      currentRouteLayer = L.geoJSON(route.geometry, { style: { color: route.color, weight: 6, opacity: 0.95 } }).addTo(map);
+      map.fitBounds(currentRouteLayer.getBounds(), { padding: [30, 30] });
+      currentPlannedRoute = { ...structuredClone(route), id: crypto.randomUUID() };
+      saveRouteBtn.disabled = false;
+      setCurrentInfo(`<strong>已載入已儲存路線</strong><br>名稱：${route.name}<br>距離：${formatDistance(route.distance)}<br>時間：${formatDuration(route.duration)}`);
+    }
+
+    window.toggleSavedRoute = toggleSavedRoute;
+    window.zoomToSavedRoute = zoomToSavedRoute;
+    window.deleteSavedRoute = deleteSavedRoute;
+    window.useSavedRouteAsCurrent = useSavedRouteAsCurrent;
+
+    function renderSavedRoutes() {
+      if (!savedRoutes.length) {
+        savedRoutesContainer.innerHTML = `<div class="status">目前還沒有儲存的路線。</div>`;
+        return;
+      }
+      savedRoutesContainer.innerHTML = savedRoutes.map(route => `
+        <div class="saved-route">
+          <div class="saved-route-header">
+            <div class="route-name-wrap">
+              <span class="color-dot" style="background:${route.color}"></span>
+              <div class="route-name">${escapeHtml(route.name)}</div>
+            </div>
+            <div style="font-size:12px; color:#64748b;">${route.visible ? "顯示中" : "已隱藏"}</div>
+          </div>
+          <div class="saved-route-meta">
+            模式：${modeText(route.mode)}<br>
+            距離：${formatDistance(route.distance)}<br>
+            時間：${formatDuration(route.duration)}<br>
+            點位：${route.waypoints.length} 個
+          </div>
+          <div class="saved-route-actions">
+            <button class="gray" onclick="toggleSavedRoute('${route.id}')">${route.visible ? "隱藏" : "顯示"}</button>
+            <button class="primary" onclick="zoomToSavedRoute('${route.id}')">定位</button>
+            <button class="warning" onclick="useSavedRouteAsCurrent('${route.id}')">載入</button>
+          </div>
+          <div class="saved-route-actions" style="margin-top:8px;">
+            <button class="danger" style="grid-column: span 3;" onclick="deleteSavedRoute('${route.id}')">刪除這條路線</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function modeText(mode) {
+      if (mode === "driving") return "開車 / 機車";
+      if (mode === "walking") return "步行";
+      if (mode === "cycling") return "自行車";
+      return mode;
+    }
+
+    function saveRoutesToLocal() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(savedRoutes));
+    }
+
+    function loadRoutesFromLocal() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        savedRoutes = parsed.map(r => ({ ...r, visible: r.visible !== false }));
+        savedRoutes.forEach(route => drawSavedRoute(route, route.visible));
+        renderSavedRoutes();
+      } catch (err) { console.error(err); }
+    }
+
+    function escapeHtml(str) {
+      return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    }
+
+    // ====================== 新增：Leaflet 主題切換 Control ======================
+    const ThemeControl = L.Control.extend({
+      onAdd: function(map) {
+        const container = L.DomUtil.create('div', 'leaflet-theme-control');
+        container.innerHTML = '🌙';
+        container.title = '切換主題（白 / 灰）';
+
+        L.DomEvent.on(container, 'click', function(e) {
+          L.DomEvent.stop(e);
+          toggleTheme();
+        });
+
+        return container;
+      }
+    });
+
+    function loadTheme() {
+      const savedTheme = localStorage.getItem("map-theme") || "light";
+      if (savedTheme === "gray") {
+        document.body.classList.add("theme-gray");
+      }
+    }
+
+    function toggleTheme() {
+      const isGray = document.body.classList.toggle("theme-gray");
+      localStorage.setItem("map-theme", isGray ? "gray" : "light");
+
+      // 更新按鈕圖示
+      const controls = document.querySelectorAll('.leaflet-theme-control');
+      controls.forEach(ctrl => {
+        ctrl.innerHTML = isGray ? '☀️' : '🌙';
+      });
+    }
+
+    // ====================== 初始化 ======================
+    redrawWaypointMarkers();
+    renderSavedRoutes();
+    loadRoutesFromLocal();
+    loadTheme();
+
+    // 新增主題切換控制項到地圖右下角
+    new ThemeControl({ position: 'bottomright' }).addTo(map);
+  </script>
+</body>
+</html>
