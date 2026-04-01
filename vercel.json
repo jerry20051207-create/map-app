@@ -1,5 +1,1 @@
-{
-  "buildCommand": "echo 'No build needed'",
-  "outputDirectory": "www",
-  "framework": "html"
-}
+{"version":2,"builds":[{"src":"index.html","use":"@vercel/static"},{"src":"sw.js","use":"@vercel/static"},{"src":"manifest.json","use":"@vercel/static"}],"routes":[{"src":"/(.*)","dest":"/index.html"}]}
